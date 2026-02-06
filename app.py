@@ -16,7 +16,7 @@ prompt = st.text_input("Dis-moi 'Coucou' :")
 
 if st.button("Envoyer"):
     try:
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        model = genai.GenerativeModel('gemini-1.5-flash-latest')
         response = model.generate_content(prompt)
         st.success(response.text)
     except Exception as e:
