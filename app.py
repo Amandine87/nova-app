@@ -1,20 +1,29 @@
 import streamlit as st
 import google.generativeai as genai
 
-st.set_page_config(page_title="Nova AI", page_icon="✨")
+# 1. Configuration et Style dynamique
+st.set_page_config(page_title="Nova Ultra", page_icon="🚀")
 
-# --- CONFIGURATION GOOGLE ---
+# Barre latérale pour les options
+with st.sidebar:
+    st.title("⚙️ Réglages Nova")
+    humeur = st.selectbox("Humeur de Nova", ["Amicale ✨", "Professionnelle 💼", "Créative 🎨", "Humoristique 🤡"])
+    mode_expert = st.toggle("Mode Expert (Réponses détaillées)")
+    if st.button("🗑️ Effacer la mémoire"):
+        st.session_state.messages = []
+        st.rerun()
+
+# 2. Connexion Google
 if "GOOGLE_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 else:
     st.error("Clé manquante.")
     st.stop()
 
-# --- MÉMOIRE DE LA CONVERSATION ---
+# 3. Mémoire et Modèle
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# --- DÉTECTION DU MODÈLE ---
 @st.cache_resource
 def load_model():
     available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
@@ -22,37 +31,35 @@ def load_model():
 
 model = load_model()
 
-# --- INTERFACE ---
-st.title("✨ Nova : Ton Assistante")
-st.markdown("---")
+# 4. Interface
+st.title(f"Assistant Nova : {humeur}")
+st.info(f"Nova agit actuellement en mode : **{humeur}**")
 
-# Affichage des messages passés
+# Affichage des messages
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# Zone de saisie
-if prompt := st.chat_input("Dis-moi quelque chose..."):
-    # On affiche le message de l'utilisateur
+# 5. Logique de réponse
+if prompt := st.chat_input("Pose ta question à Nova..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # Réponse de Nova
     with st.chat_message("assistant"):
         try:
-            # On envoie toute l'histoire à Nova pour qu'elle ait de la mémoire
-            full_prompt = "Tu es Nova, une IA amicale et intelligente. Réponds de façon concise. \n\n"
-            for m in st.session_state.messages:
-                full_prompt += f"{m['role']}: {m['content']}\n"
+            # Construction du caractère de Nova selon les réglages
+            precision = "détaillée et technique" if mode_expert else "simple et concise"
+            system_instruction = f"Tu es Nova. Ton humeur est {humeur}. Ta réponse doit être {precision}."
             
-            response = model.generate_content(full_prompt)
+            # On prépare l'historique
+            history = ""
+            for m in st.session_state.messages:
+                history += f"{m['role']}: {m['content']}\n"
+            
+            response = model.generate_content(f"{system_instruction}\n\nHistorique :\n{history}")
+            
             st.markdown(response.text)
             st.session_state.messages.append({"role": "assistant", "content": response.text})
         except Exception as e:
-            st.error(f"Oups : {e}")
-
-# Bouton pour effacer la mémoire
-if st.sidebar.button("Effacer la discussion"):
-    st.session_state.messages = []
-    st.rerun()
+            st.error(f"Erreur : {e}")
