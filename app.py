@@ -69,4 +69,9 @@ if prompt := st.chat_input("Pose ta question ici..."):
             st.session_state.messages.append({"role": "assistant", "content": txt})
             
             if voice_ok and txt:
-                tts
+                tts = gTTS(text=txt, lang='fr')
+                fp = io.BytesIO()
+                tts.write_to_fp(fp)
+                st.audio(fp)
+        except Exception as e:
+            st.error(f"Erreur : {e}")
