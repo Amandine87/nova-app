@@ -2,70 +2,64 @@ import streamlit as st
 import google.generativeai as genai
 from PIL import Image
 
-# 1. DESIGN ET CONFIGURATION (CSS)
-st.set_page_config(page_title="Nova Vision", page_icon="🎓", layout="centered")
+# 1. STYLE ET CONFIG
+st.set_page_config(page_title="Nova Vision", page_icon="🎓")
 
-st.markdown("""
-    <style>
-    .stApp { background: linear-gradient(to bottom, #f0f2f6, #ffffff); }
-    h1 { color: #2e4a7d; font-family: 'Helvetica Neue', sans-serif; }
-    section[data-testid="stSidebar"] { background-color: #e3e9f2; }
-    [data-testid="stChatMessage"] { border-radius: 15px; padding: 10px; margin-bottom: 10px; }
-    </style>
-    """, unsafe_allow_html=True)
-
-# 2. BARRE LATÉRALE
-with st.sidebar:
-    st.title("🎓 Nova Vision")
-    niveau = st.selectbox("Niveau de l'élève", ["Primaire", "Collège", "Lycée", "Supérieur"])
-    
-    st.markdown("---")
-    st.write("📷 **Analyse de document**")
-    # Zone pour uploader l'image
-    uploaded_file = st.file_uploader("Envoie une photo de ton exercice", type=['png', 'jpg', 'jpeg'])
-    
-    st.markdown("---")
-    if st.button("🗑️ Effacer la discussion"):
-        st.session_state.messages = []
-        st.rerun()
-
-# 3. CONNEXION ET DÉTECTION DU MODÈLE
+# 2. CONNEXION (Plus robuste)
 if "GOOGLE_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 else:
-    st.error("Clé API manquante dans les Secrets Streamlit.")
+    st.error("Clé API manquante.")
     st.stop()
 
+# 3. DÉTECTION DU MODÈLE (Version simplifiée pour éviter l'erreur 404)
+@st.cache_resource
+def get_model():
+    # On force le nom complet qui fonctionne souvent mieux
+    return genai.GenerativeModel('models/gemini-1.5-flash')
+
+model = get_model()
+
+# 4. BARRE LATÉRALE
+with st.sidebar:
+    st.title("⚙️ Options")
+    niveau = st.selectbox("Niveau", ["Primaire", "Collège", "Lycée"])
+    uploaded_file = st.file_uploader("Importer un exercice", type=['png', 'jpg', 'jpeg'])
+    if st.button("Effacer tout"):
+        st.session_state.messages = []
+        st.rerun()
+
+# 5. GESTION DES MESSAGES
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-@st.cache_resource
-def load_model_detective():
-    # Cette fonction cherche le nom exact du modèle sur ton compte pour éviter l'erreur 404
-    try:
-        for m in genai.list_models():
-            if 'generateContent' in m.supported_generation_methods:
-                if '1.5-flash' in m.name:
-                    return genai.GenerativeModel(m.name)
-        return genai.GenerativeModel('gemini-pro')
-    except:
-        return genai.GenerativeModel('gemini-1.5-flash')
+st.title("✨ Nova Vision")
 
-model = load_model_detective()
+for m in st.session_state.messages:
+    with st.chat_message(m["role"]):
+        st.write(m["content"])
 
-# 4. INTERFACE PRINCIPALE
-st.title("✨ Nova : Aide aux devoirs")
-st.caption(f"Mode Vision activé • Niveau actuel : {niveau}")
-
-# Affichage des messages précédents
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
-
-# 5. LOGIQUE DE CHAT ET VISION
-if prompt := st.chat_input("Pose ta question ici..."):
-    # On affiche le message de l'utilisateur
+# 6. ENVOI ET RÉPONSE
+if prompt := st.chat_input("Ta question sur l'exercice..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
-        st.markdown
-        
+        st.write(prompt)
+
+    with st.chat_message("assistant"):
+        try:
+            full_content = [f"Tu es Nova, tutrice niveau {niveau}. Pédagogie max.", prompt]
+            
+            if uploaded_file:
+                img = Image.open(uploaded_file)
+                full_content.append(img)
+                st.image(img, width=250)
+
+            # Utilisation d'un spinner pour faire patienter
+            with st.spinner("Nova analyse le document..."):
+                response = model.generate_content(full_content)
+                text_response = response.text
+                
+            st.write(text_response)
+            st.session_state.messages.append({"role": "assistant", "content": text_response})
+            
+        except Exception as e:
