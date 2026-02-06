@@ -4,10 +4,10 @@ from PIL import Image
 from gtts import gTTS
 import io
 
-# --- 1. CONFIGURATION ---
+# 1. CONFIGURATION
 st.set_page_config(page_title="Nova : Tutrice Intelligente", page_icon="🎓")
 
-# --- 2. CONNEXION API & MODÈLE ---
+# 2. CONNEXION API & MODÈLE (Correction 404)
 if "GOOGLE_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 else:
@@ -16,24 +16,25 @@ else:
 
 @st.cache_resource
 def get_model():
+    # Liste les modèles pour trouver celui qui accepte generateContent
     try:
         models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-        flash_models = [m for m in models if "flash" in m]
-        model_name = flash_models[0] if flash_models else models[0]
-        return genai.GenerativeModel(model_name)
-    except Exception:
+        # On cherche gemini-1.5-flash ou gemini-pro
+        selected = next((m for m in models if "1.5-flash" in m), models[0])
+        return genai.GenerativeModel(selected)
+    except:
         return genai.GenerativeModel('gemini-1.5-flash')
 
 model = get_model()
 
-# --- 3. FONCTION AUDIO ---
+# 3. FONCTION AUDIO
 def create_audio(text):
     tts = gTTS(text=text, lang='fr')
     audio_buffer = io.BytesIO()
     tts.write_to_fp(audio_buffer)
     return audio_buffer
 
-# --- 4. BARRE LATÉRALE ---
+# 4. BARRE LATÉRALE
 with st.sidebar:
     st.title("🚀 Menu Nova")
     niveau = st.selectbox("Niveau scolaire", ["Primaire", "Collège", "Lycée", "Supérieur"])
@@ -44,14 +45,14 @@ with st.sidebar:
         st.session_state.messages = []
         st.rerun()
 
-# --- 5. INITIALISATION ---
+# 5. INITIALISATION MÉMOIRE
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
 st.title("✨ Nova : Ta Tutrice")
 st.caption(f"Prête à t'aider • Niveau : {niveau}")
 
-# --- 6. AFFICHAGE ---
+# 6. AFFICHAGE DES MESSAGES
 for i, m in enumerate(st.session_state.messages):
     with st.chat_message(m["role"]):
         st.markdown(m["content"])
@@ -60,7 +61,7 @@ for i, m in enumerate(st.session_state.messages):
                 audio_file = create_audio(m["content"])
                 st.audio(audio_file, format='audio/mp3')
 
-# --- 7. LOGIQUE DE CHAT ---
+# 7. LOGIQUE DE CHAT
 if prompt := st.chat_input("Pose ta question ici..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
@@ -68,7 +69,8 @@ if prompt := st.chat_input("Pose ta question ici..."):
 
     with st.chat_message("assistant"):
         try:
-            instruction = f"Tu es Nova, une tutrice pour le niveau {niveau}. Sois pédagogue et décompose tes explications."
+            # Préparation du contenu (Texte + Image)
+            instruction = f"Tu es Nova, une tutrice pour le niveau {niveau}. Aide l'élève de façon pédagogue sur ce document."
             contenu_final = [instruction, prompt]
             
             if uploaded_file:
@@ -83,9 +85,9 @@ if prompt := st.chat_input("Pose ta question ici..."):
             st.markdown(reponse_texte)
             st.session_state.messages.append({"role": "assistant", "content": reponse_texte})
             
-            # Lecture audio automatique
+            # Lecture audio automatique pour la nouvelle réponse
             audio_fp = create_audio(reponse_texte)
             st.audio(audio_fp, format='audio/mp3')
             
         except Exception as e:
-            st.error(f"Une erreur est survenue : {e}")
+            st.error(f"Désolé, j'ai un souci technique : {e}")
