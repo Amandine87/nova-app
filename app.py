@@ -1,31 +1,13 @@
 import streamlit as st
 import google.generativeai as genai
 from PIL import Image
+from gtts import gTTS
+import io
 
-# 1. CONFIGURATION ET STYLE
+# 1. CONFIGURATION
 st.set_page_config(page_title="Nova Audio", page_icon="🎓")
 
-# PETIT SCRIPT POUR LA LECTURE VOCALE
-st.markdown("""
-    <script>
-    function speak(text) {
-        window.speechSynthesis.cancel(); // Arrête toute lecture en cours
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = 'fr-FR'; // Force la voix française
-        window.speechSynthesis.speak(utterance);
-    }
-    </script>
-    """, unsafe_allow_html=True)
-
-st.markdown("""
-    <style>
-    .stApp { background: linear-gradient(to bottom, #f4f7f9, #ffffff); }
-    [data-testid="stChatMessage"] { border-radius: 15px; }
-    .stButton>button { border-radius: 20px; }
-    </style>
-    """, unsafe_allow_html=True)
-
-# 2. CONNEXION ET MODÈLE
+# 2. CONNEXION API
 if "GOOGLE_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 else:
@@ -58,17 +40,24 @@ if "messages" not in st.session_state:
 
 st.title("✨ Nova : Ta Tutrice Vocale")
 
-# 5. AFFICHAGE DES MESSAGES + BOUTON AUDIO
+# 5. FONCTION POUR GÉNÉRER L'AUDIO
+def play_audio(text):
+    tts = gTTS(text=text, lang='fr')
+    fp = io.BytesIO()
+    tts.write_to_fp(fp)
+    return fp
+
+# 6. AFFICHAGE DES MESSAGES
 for i, m in enumerate(st.session_state.messages):
     with st.chat_message(m["role"]):
         st.write(m["content"])
-        # On ajoute un bouton audio uniquement pour les réponses de Nova
         if m["role"] == "assistant":
-            if st.button(f"🔊 Écouter", key=f"audio_{i}"):
-                # On utilise un petit hack Streamlit pour appeler la fonction JS
-                st.components.v1.html(f"<script>window.parent.speak({repr(m['content'])})</script>", height=0)
+            # On crée un bouton qui génère un petit lecteur audio
+            if st.button(f"🔊 Préparer l'audio", key=f"btn_{i}"):
+                audio_fp = play_audio(m["content"])
+                st.audio(audio_fp, format='audio/mp3')
 
-# 6. LOGIQUE DE CHAT
+# 7. LOGIQUE DE CHAT
 if prompt := st.chat_input("Pose ta question..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
@@ -76,22 +65,23 @@ if prompt := st.chat_input("Pose ta question..."):
 
     with st.chat_message("assistant"):
         try:
-            instructions = f"Tu es Nova, tutrice {niveau}. Réponds de façon claire et encourageante."
+            instructions = f"Tu es Nova, tutrice {niveau}. Réponds de façon claire et courte."
             full_content = [instructions, prompt]
             if uploaded_file:
                 img = Image.open(uploaded_file)
                 full_content.append(img)
                 st.image(img, width=250)
 
-            with st.spinner("Nova prépare sa réponse..."):
+            with st.spinner("Nova réfléchit..."):
                 response = model.generate_content(full_content)
                 res_text = response.text
                 
             st.write(res_text)
             st.session_state.messages.append({"role": "assistant", "content": res_text})
-            # Petit bouton immédiat pour le dernier message
-            if st.button("🔊 Écouter cette réponse"):
-                st.components.v1.html(f"<script>window.parent.speak({repr(res_text)})</script>", height=0)
+            
+            # Option audio immédiate pour la réponse
+            audio_fp = play_audio(res_text)
+            st.audio(audio_fp, format='audio/mp3')
                 
         except Exception as e:
             st.error(f"Erreur : {e}")
