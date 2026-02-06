@@ -4,19 +4,18 @@ from PIL import Image
 from gtts import gTTS
 import io
 
-# --- 1. CONFIGURATION DE LA PAGE ---
-st.set_page_config(page_title="Nova : Tutrice Intelligente", page_icon="🎓", layout="centered")
+# --- 1. CONFIGURATION ---
+st.set_page_config(page_title="Nova : Tutrice Intelligente", page_icon="🎓")
 
 # --- 2. CONNEXION API & MODÈLE ---
 if "GOOGLE_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 else:
-    st.error("Clé API manquante dans les secrets Streamlit.")
+    st.error("Clé API manquante dans les secrets.")
     st.stop()
 
 @st.cache_resource
 def get_model():
-    # Détection automatique du meilleur modèle disponible (évite l'erreur 404)
     try:
         models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
         flash_models = [m for m in models if "flash" in m]
@@ -27,59 +26,66 @@ def get_model():
 
 model = get_model()
 
-# --- 3. FONCTION AUDIO (gTTS) ---
+# --- 3. FONCTION AUDIO ---
 def create_audio(text):
     tts = gTTS(text=text, lang='fr')
     audio_buffer = io.BytesIO()
     tts.write_to_fp(audio_buffer)
     return audio_buffer
 
-# --- 4. BARRE LATÉRALE (SIDEBAR) ---
+# --- 4. BARRE LATÉRALE ---
 with st.sidebar:
     st.title("🚀 Menu Nova")
     niveau = st.selectbox("Niveau scolaire", ["Primaire", "Collège", "Lycée", "Supérieur"])
-    
     st.write("---")
     st.write("📷 **Analyse de document**")
-    uploaded_file = st.file_uploader("Envoie une photo de ton cours/exercice", type=['png', 'jpg', 'jpeg'])
-    
-    st.write("---")
+    uploaded_file = st.file_uploader("Photo de l'exercice", type=['png', 'jpg', 'jpeg'])
     if st.button("🗑️ Effacer la discussion"):
         st.session_state.messages = []
         st.rerun()
 
-# --- 5. INITIALISATION DE LA MÉMOIRE ---
+# --- 5. INITIALISATION ---
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
 st.title("✨ Nova : Ta Tutrice")
-st.caption(f"Connectée • Niveau : {niveau} • Modèle : {model.model_name}")
+st.caption(f"Prête à t'aider • Niveau : {niveau}")
 
-# --- 6. AFFICHAGE DES MESSAGES ---
+# --- 6. AFFICHAGE ---
 for i, m in enumerate(st.session_state.messages):
     with st.chat_message(m["role"]):
         st.markdown(m["content"])
-        # Si c'est Nova qui parle, on propose d'écouter
         if m["role"] == "assistant":
             if st.button(f"🔊 Écouter", key=f"btn_{i}"):
                 audio_file = create_audio(m["content"])
                 st.audio(audio_file, format='audio/mp3')
 
-# --- 7. ZONE DE CHAT ET LOGIQUE ---
+# --- 7. LOGIQUE DE CHAT ---
 if prompt := st.chat_input("Pose ta question ici..."):
-    # On ajoute le message de l'utilisateur
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # Réponse de Nova
     with st.chat_message("assistant"):
         try:
-            # Préparation du contexte
-            instruction = f"Tu es Nova, une tutrice pour le niveau {niveau}. Sois très pédagogue, encourageante, et n'hésite pas à décomposer tes explications."
-            contenu = [instruction, prompt]
+            instruction = f"Tu es Nova, une tutrice pour le niveau {niveau}. Sois pédagogue et décompose tes explications."
+            contenu_final = [instruction, prompt]
             
-            # Si une image est présente
             if uploaded_file:
                 image = Image.open(uploaded_file)
-                conten
+                contenu_final.append(image)
+                st.image(image, width=300)
+
+            with st.spinner("Nova analyse..."):
+                response = model.generate_content(contenu_final)
+                reponse_texte = response.text
+            
+            st.markdown(reponse_texte)
+            st.session_state.messages.append({"role": "assistant", "content": reponse_texte})
+            
+            # Lecture audio automatique
+            audio_fp = create_audio(reponse_texte)
+            st.audio(audio_fp, format='audio/mp3')
+            
+        except Exception as e:
+            st.error(f"Une erreur est survenue : {e}")
