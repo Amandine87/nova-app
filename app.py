@@ -49,14 +49,23 @@ for message in st.session_state.messages:
 # --- LOGIQUE DU BOUTON QUIZ ---
 if generer_quiz:
     with st.chat_message("assistant"):
-        try:
-            prompt_quiz = f"En fonction de notre discussion précédente et du niveau {niveau}, propose-moi un seul exercice court ou une question de compréhension pour vérifier que j'ai bien compris. Ne donne pas la réponse tout de suite !"
-            response = model.generate_content(prompt_quiz)
-            st.markdown("### 📝 Ton petit défi :")
-            st.markdown(response.text)
-            st.session_state.messages.append({"role": "assistant", "content": f"📝 DÉFI : {response.text}"})
-        except Exception as e:
-            st.error(f"Erreur : {e}")
+        if not st.session_state.messages:
+            msg_vide = "Je ne peux pas encore te tester car nous n'avons pas commencé la leçon ! 📝 Quel sujet veux-tu que je t'explique en premier ?"
+            st.info(msg_vide)
+        else:
+            try:
+                # On lui demande d'être cohérente avec le contenu réel
+                prompt_quiz = f"""
+                En te basant UNIQUEMENT sur les explications données précédemment dans cette discussion, 
+                propose un exercice court au niveau {niveau}. 
+                Si la discussion est trop courte ou peu claire, demande à l'élève quel point précis il veut tester.
+                """
+                response = model.generate_content(prompt_quiz)
+                st.markdown("### 📝 Ton petit défi :")
+                st.markdown(response.text)
+                st.session_state.messages.append({"role": "assistant", "content": f"📝 DÉFI : {response.text}"})
+            except Exception as e:
+                st.error(f"Erreur : {e}")
 
 # 5. Logique de Discussion standard
 if prompt := st.chat_input("Pose ta question ou réponds au quiz..."):
