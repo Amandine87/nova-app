@@ -1,45 +1,37 @@
 import streamlit as st
 import google.generativeai as genai
 
-# Configuration de la page
-st.set_page_config(page_title="Nova - Ton Coach Révision", page_icon="🎓")
+# 1. Configuration de la page (Apparence)
+st.set_page_config(page_title="Nova - Ton Coach Révision", page_icon="🎓", layout="centered")
 
-# --- CONNEXION À L'IA ---
-# On va chercher la clé API dans les secrets de Streamlit
+# 2. Connexion sécurisée à l'IA de Google
 if "GOOGLE_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
+    model = genai.GenerativeModel('gemini-1.5-flash')
 else:
-    st.error("Oups ! La clé API est manquante dans les réglages de l'app.")
+    st.error("Configuration incomplète : Clé API introuvable dans les Secrets de Streamlit.")
+    st.stop()
 
-model = genai.GenerativeModel('gemini-1.5-flash')
+# 3. Barre latérale : Choix du niveau
+st.sidebar.title("Configuration")
+niveau = st.sidebar.radio("Ton niveau scolaire :", ["Collège (Coach Cool)", "Lycée (Mentor Sérieux)"])
 
-# --- INTERFACE ---
-st.title("🎓 Nova : Ton compagnon de révision")
+# 4. Personnalisation du comportement de Nova
+if niveau == "Collège (Coach Cool)":
+    nom_coach = "Nova 🚀"
+    instruction_ia = "Tu es Nova, un grand frère coach pour collégien. Ton but est d'aider l'élève à comprendre par lui-même. Utilise des emojis, sois très encourageant, et ne donne JAMAIS la réponse directement. Pose des questions progressives."
+    message_accueil = "Salut ! 👋 Prêt à relever le défi du jour ? Quel sujet te pose problème ?"
+else:
+    nom_coach = "Nova Académie 🏛️"
+    instruction_ia = "Tu es Nova, un mentor académique pour lycéen. Aide à comprendre la méthodologie et les concepts complexes. Ton ton est sérieux, structuré, mais bienveillant. Focalise-toi sur la logique et la rigueur."
+    message_accueil = "Bonjour. Quelle notion ou méthodologie souhaitez-vous approfondir aujourd'hui ?"
+
+# 5. Interface principale
+st.title(f"🎓 {nom_coach}")
+st.write(message_accueil)
 st.markdown("---")
 
-niveau = st.sidebar.radio("Ton niveau :", ["Collège (Cool)", "Lycée (Sérieux)"])
+# Zone de saisie de l'élève
+user_input = st.text_area("Explique-moi ce que tu révises :", placeholder="Ex: Je ne comprends pas le cycle de l'eau...")
 
-# Personnalisation du tuteur selon le niveau
-if niveau == "Collège (Cool)":
-    prompt_systeme = "Tu es un grand frère coach. Ton but est d'aider l'élève à trouver la réponse par lui-même. Utilise des emojis, sois encourageant. Ne donne jamais la réponse directement, pose des questions pour le guider."
-    st.write("### Salut ! 👋 Prêt à décrocher tes badges ?")
-else:
-    prompt_systeme = "Tu es un mentor académique sérieux et structuré. Aide l'élève de lycée à comprendre la méthodologie. Sois précis et exigeant tout en restant bienveillant."
-    st.write("### Bonjour. Quelle notion allons-nous approfondir ?")
-
-user_input = st.text_area("Ta demande :", placeholder="Ex: Je n'ai pas compris comment marchent les volcans...")
-
-if st.button("Demander de l'aide"):
-    if user_input:
-        with st.spinner("Nova réfléchit..."):
-            try:
-                # On envoie la demande à l'IA avec les instructions de ton "Tuteur"
-                reponse = model.generate_content(f"Instructions : {prompt_systeme} \n\n Question de l'élève : {user_input}")
-                st.write(reponse.text)
-                
-                if niveau == "Collège (Cool)":
-                    st.success("🏆 Badge 'Curiosité' débloqué !")
-            except Exception as e:
-                st.error(f"Une erreur est survenue : {e}")
-    else:
-        st.warning("Dis-moi ce que tu veux réviser !")
+if st.button("Demander de l'aide
