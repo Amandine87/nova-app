@@ -4,16 +4,17 @@ import google.generativeai as genai
 # Configuration de la page
 st.set_page_config(page_title="Nova Test")
 
-# Connexion ultra-simple
+# Connexion directe
 if "GOOGLE_API_KEY" in st.secrets:
-    genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
+    api_key = st.secrets["GOOGLE_API_KEY"]
+    genai.configure(api_key=api_key)
+    # On utilise le modèle 1.5-flash-latest qui est le plus moderne
+    model = genai.GenerativeModel('gemini-1.5-flash-latest')
 else:
-    st.error("Clé manquante dans les Secrets !")
+    st.error("Désolé, je ne trouve toujours pas la clé dans les Secrets.")
+    st.stop()
 
 st.title("🚀 Nova : Test de connexion")
-
-# LE CHANGEMENT ICI : On utilise 'gemini-pro'
-model = genai.GenerativeModel('gemini-1.0-pro')
 
 user_input = st.text_input("Dis quelque chose à Nova :")
 
@@ -24,3 +25,4 @@ if st.button("Lancer le test"):
         st.success(response.text)
     except Exception as e:
         st.error(f"Erreur : {e}")
+        
