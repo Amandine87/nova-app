@@ -2,7 +2,7 @@ import streamlit as st
 import google.generativeai as genai
 from PIL import Image
 
-# 1. DESIGN ET CONFIGURATION
+# 1. DESIGN ET CONFIGURATION (CSS)
 st.set_page_config(page_title="Nova Vision", page_icon="🎓", layout="centered")
 
 st.markdown("""
@@ -21,61 +21,51 @@ with st.sidebar:
     
     st.markdown("---")
     st.write("📷 **Analyse de document**")
-    uploaded_file = st.file_uploader("Prends en photo ton exercice", type=['png', 'jpg', 'jpeg'])
+    # Zone pour uploader l'image
+    uploaded_file = st.file_uploader("Envoie une photo de ton exercice", type=['png', 'jpg', 'jpeg'])
     
     st.markdown("---")
-    if st.button("🗑️ Effacer la leçon"):
+    if st.button("🗑️ Effacer la discussion"):
         st.session_state.messages = []
         st.rerun()
 
-# 3. CONNEXION API
+# 3. CONNEXION ET DÉTECTION DU MODÈLE
 if "GOOGLE_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 else:
-    st.error("Clé API manquante.")
+    st.error("Clé API manquante dans les Secrets Streamlit.")
     st.stop()
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
 @st.cache_resource
-def load_model():
-    # On utilise gemini-1.5-flash qui est excellent pour la vision
-    return genai.GenerativeModel('gemini-1.5-flash')
+def load_model_detective():
+    # Cette fonction cherche le nom exact du modèle sur ton compte pour éviter l'erreur 404
+    try:
+        for m in genai.list_models():
+            if 'generateContent' in m.supported_generation_methods:
+                if '1.5-flash' in m.name:
+                    return genai.GenerativeModel(m.name)
+        return genai.GenerativeModel('gemini-pro')
+    except:
+        return genai.GenerativeModel('gemini-1.5-flash')
 
-model = load_model()
+model = load_model_detective()
 
-# 4. INTERFACE
+# 4. INTERFACE PRINCIPALE
 st.title("✨ Nova : Aide aux devoirs")
+st.caption(f"Mode Vision activé • Niveau actuel : {niveau}")
 
+# Affichage des messages précédents
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
 # 5. LOGIQUE DE CHAT ET VISION
 if prompt := st.chat_input("Pose ta question ici..."):
+    # On affiche le message de l'utilisateur
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
-        st.markdown(prompt)
-
-    with st.chat_message("assistant"):
-        try:
-            # Préparation du contexte pédagogique
-            instructions = f"Tu es Nova, tutrice {niveau}. Aide l'élève de manière pédagogique."
-            
-            content_to_send = [instructions, prompt]
-            
-            # SI UN FICHIER EST TÉLÉCHARGÉ
-            if uploaded_file is not None:
-                img = Image.open(uploaded_file)
-                content_to_send.append(img)
-                st.image(img, caption="Document analysé", width=300)
-            
-            # Envoi à Gemini
-            response = model.generate_content(content_to_send)
-            
-            st.markdown(response.text)
-            st.session_state.messages.append({"role": "assistant", "content": response.text})
-            
-        except Exception as e:
-            st.error(f"Erreur : {e}")
+        st.markdown
+        
