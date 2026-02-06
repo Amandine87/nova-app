@@ -13,7 +13,7 @@ else:
 st.title("🚀 Nova : Test de connexion")
 
 # LE CHANGEMENT ICI : On utilise 'gemini-pro'
-model = genai.GenerativeModel('gemini-pro')
+model = genai.GenerativeModel('gemini-1.0-pro')
 
 user_input = st.text_input("Dis quelque chose à Nova :")
 
