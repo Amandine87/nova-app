@@ -9,7 +9,7 @@ if "GOOGLE_API_KEY" in st.secrets:
     api_key = st.secrets["GOOGLE_API_KEY"]
     genai.configure(api_key=api_key)
     # On utilise le modèle 1.5-flash-latest qui est le plus moderne
-    model = genai.GenerativeModel('gemini-1.5-flash-latest')
+    model = genai.GenerativeModel('gemini-pro')
 else:
     st.error("Désolé, je ne trouve toujours pas la clé dans les Secrets.")
     st.stop()
