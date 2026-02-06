@@ -7,7 +7,7 @@ st.set_page_config(page_title="Nova - Ton Coach Révision", page_icon="🎓")
 # Connexion à l'IA
 if "GOOGLE_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    model = genai.GenerativeModel('gemini-1.5-flash-latest')
 else:
     st.error("Configuration incomplète : Clé API introuvable.")
     st.stop()
