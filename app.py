@@ -19,42 +19,39 @@ else:
     st.error("Clé API manquante dans les Secrets.")
     st.stop()
 
-# --- SÉLECTION DU MODÈLE (ANTI-404) ---
+# --- DÉTECTION DYNAMIQUE (ANTI-404) ---
 @st.cache_resource
-def load_model():
-    # Liste des noms que Google utilise selon les régions/comptes
-    noms_possibles = [
-        'gemini-1.5-flash-latest', 
-        'gemini-1.5-flash', 
-        'models/gemini-1.5-flash',
-        'gemini-pro-vision'
-    ]
-    
-    for nom in noms_possibles:
-        try:
-            m = genai.GenerativeModel(nom)
-            # Petit test rapide pour voir si le modèle répond
-            return m
-        except:
-            continue
-    return genai.GenerativeModel('gemini-pro') # Dernier recours
+def find_working_model():
+    try:
+        # On demande à Google la liste des modèles utilisables sur TON compte
+        available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        
+        # Priorité : 1. Flash (rapide), 2. Pro, 3. Le premier de la liste
+        for m_name in available_models:
+            if "1.5-flash" in m_name: return genai.GenerativeModel(m_name)
+        for m_name in available_models:
+            if "pro" in m_name: return genai.GenerativeModel(m_name)
+        
+        return genai.GenerativeModel(available_models[0])
+    except Exception as e:
+        # Si même la liste échoue, on tente le nom standard sans le préfixe 'models/'
+        return genai.GenerativeModel('gemini-1.5-flash')
 
-model = load_model()
+model = find_working_model()
 
 # --- INTERFACE ---
 st.title("✨ Nova : Aide aux devoirs")
 
 with st.sidebar:
-    st.info(f"Modèle : {model.model_name}")
+    st.info(f"Modèle actif : {model.model_name}")
     img_file = st.file_uploader("Photo de l'exercice", type=['png', 'jpg', 'jpeg'])
-    if st.button("Réinitialiser la discussion"):
+    if st.button("Réinitialiser"):
         st.session_state.messages = []
         st.rerun()
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Affichage des messages
 for i, m in enumerate(st.session_state.messages):
     with st.chat_message(m["role"]):
         st.write(m["content"])
@@ -67,27 +64,11 @@ if prompt := st.chat_input("Pose ta question ici..."):
 
     with st.chat_message("assistant"):
         try:
-            # Préparation du contenu
-            content = [prompt]
+            content = [f"Tu es Nova, une tutrice pédagogue. Aide l'élève sur : {prompt}"]
             if img_file:
                 img = Image.open(img_file)
                 st.image(img, width=250)
                 content.append(img)
             
-            # Génération de la réponse
-            response = model.generate_content(content)
-            txt = response.text
-            
-            st.write(txt)
-            st.session_state.messages.append({"role": "assistant", "content": txt})
-            
-            # Audio
-            if voice_ok and txt:
-                tts = gTTS(text=txt, lang='fr')
-                fp = io.BytesIO()
-                tts.write_to_fp(fp)
-                st.audio(fp)
-                
-        except Exception as e:
-            st.error(f"Erreur technique : {e}")
-            st.info("Conseil : Si l'erreur persiste, essaie de rafraîchir la page.")
+            # Génération
+            response = model
