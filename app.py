@@ -4,84 +4,82 @@ from PIL import Image
 from gtts import gTTS
 import io
 
-# 1. CONFIGURATION
-st.set_page_config(page_title="Nova Audio", page_icon="🎓")
+# --- 1. CONFIGURATION DE LA PAGE ---
+st.set_page_config(page_title="Nova : Tutrice Intelligente", page_icon="🎓", layout="centered")
 
-# 2. CONNEXION API
+# --- 2. CONNEXION API & MODÈLE ---
 if "GOOGLE_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 else:
-    st.error("Clé API manquante.")
+    st.error("Clé API manquante dans les secrets Streamlit.")
     st.stop()
 
 @st.cache_resource
-def get_best_model():
+def get_model():
+    # Détection automatique du meilleur modèle disponible (évite l'erreur 404)
     try:
         models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
         flash_models = [m for m in models if "flash" in m]
-        return genai.GenerativeModel(flash_models[0] if flash_models else models[0])
-    except:
+        model_name = flash_models[0] if flash_models else models[0]
+        return genai.GenerativeModel(model_name)
+    except Exception:
         return genai.GenerativeModel('gemini-1.5-flash')
 
-model = get_best_model()
+model = get_model()
 
-# 3. BARRE LATÉRALE
+# --- 3. FONCTION AUDIO (gTTS) ---
+def create_audio(text):
+    tts = gTTS(text=text, lang='fr')
+    audio_buffer = io.BytesIO()
+    tts.write_to_fp(audio_buffer)
+    return audio_buffer
+
+# --- 4. BARRE LATÉRALE (SIDEBAR) ---
 with st.sidebar:
-    st.title("⚙️ Options Nova")
-    niveau = st.selectbox("Niveau", ["Primaire", "Collège", "Lycée"])
-    uploaded_file = st.file_uploader("Document à analyser", type=['png', 'jpg', 'jpeg'])
+    st.title("🚀 Menu Nova")
+    niveau = st.selectbox("Niveau scolaire", ["Primaire", "Collège", "Lycée", "Supérieur"])
+    
+    st.write("---")
+    st.write("📷 **Analyse de document**")
+    uploaded_file = st.file_uploader("Envoie une photo de ton cours/exercice", type=['png', 'jpg', 'jpeg'])
+    
+    st.write("---")
     if st.button("🗑️ Effacer la discussion"):
         st.session_state.messages = []
         st.rerun()
 
-# 4. MÉMOIRE DU CHAT
+# --- 5. INITIALISATION DE LA MÉMOIRE ---
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-st.title("✨ Nova : Ta Tutrice Vocale")
+st.title("✨ Nova : Ta Tutrice")
+st.caption(f"Connectée • Niveau : {niveau} • Modèle : {model.model_name}")
 
-# 5. FONCTION POUR GÉNÉRER L'AUDIO
-def play_audio(text):
-    tts = gTTS(text=text, lang='fr')
-    fp = io.BytesIO()
-    tts.write_to_fp(fp)
-    return fp
-
-# 6. AFFICHAGE DES MESSAGES
+# --- 6. AFFICHAGE DES MESSAGES ---
 for i, m in enumerate(st.session_state.messages):
     with st.chat_message(m["role"]):
-        st.write(m["content"])
+        st.markdown(m["content"])
+        # Si c'est Nova qui parle, on propose d'écouter
         if m["role"] == "assistant":
-            # On crée un bouton qui génère un petit lecteur audio
-            if st.button(f"🔊 Préparer l'audio", key=f"btn_{i}"):
-                audio_fp = play_audio(m["content"])
-                st.audio(audio_fp, format='audio/mp3')
+            if st.button(f"🔊 Écouter", key=f"btn_{i}"):
+                audio_file = create_audio(m["content"])
+                st.audio(audio_file, format='audio/mp3')
 
-# 7. LOGIQUE DE CHAT
-if prompt := st.chat_input("Pose ta question..."):
+# --- 7. ZONE DE CHAT ET LOGIQUE ---
+if prompt := st.chat_input("Pose ta question ici..."):
+    # On ajoute le message de l'utilisateur
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
-        st.write(prompt)
+        st.markdown(prompt)
 
+    # Réponse de Nova
     with st.chat_message("assistant"):
         try:
-            instructions = f"Tu es Nova, tutrice {niveau}. Réponds de façon claire et courte."
-            full_content = [instructions, prompt]
-            if uploaded_file:
-                img = Image.open(uploaded_file)
-                full_content.append(img)
-                st.image(img, width=250)
-
-            with st.spinner("Nova réfléchit..."):
-                response = model.generate_content(full_content)
-                res_text = response.text
-                
-            st.write(res_text)
-            st.session_state.messages.append({"role": "assistant", "content": res_text})
+            # Préparation du contexte
+            instruction = f"Tu es Nova, une tutrice pour le niveau {niveau}. Sois très pédagogue, encourageante, et n'hésite pas à décomposer tes explications."
+            contenu = [instruction, prompt]
             
-            # Option audio immédiate pour la réponse
-            audio_fp = play_audio(res_text)
-            st.audio(audio_fp, format='audio/mp3')
-                
-        except Exception as e:
-            st.error(f"Erreur : {e}")
+            # Si une image est présente
+            if uploaded_file:
+                image = Image.open(uploaded_file)
+                conten
