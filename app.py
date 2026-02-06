@@ -1,23 +1,26 @@
 import streamlit as st
 import google.generativeai as genai
 
-# On récupère la clé proprement
+# Configuration de la page
+st.set_page_config(page_title="Nova Test")
+
+# Connexion ultra-simple
 if "GOOGLE_API_KEY" in st.secrets:
-    api_key = st.secrets["GOOGLE_API_KEY"]
+    genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 else:
-    # Si le format [general] a été utilisé
-    api_key = st.secrets.general["GOOGLE_API_KEY"]
+    st.error("Clé manquante dans les Secrets !")
 
-genai.configure(api_key=api_key)
+st.title("🚀 Nova : Test de connexion")
 
-st.title("Test Nova 🚀")
+# LE CHANGEMENT ICI : On utilise 'gemini-pro'
+model = genai.GenerativeModel('gemini-pro')
 
-prompt = st.text_input("Dis-moi 'Coucou' :")
+user_input = st.text_input("Dis quelque chose à Nova :")
 
-if st.button("Envoyer"):
+if st.button("Lancer le test"):
     try:
-        model = genai.GenerativeModel('gemini-1.5-flash-latest')
-        response = model.generate_content(prompt)
+        response = model.generate_content(user_input)
+        st.write("### Réponse de Nova :")
         st.success(response.text)
     except Exception as e:
-        st.error(f"Zut, l'erreur est : {e}")
+        st.error(f"Erreur : {e}")
