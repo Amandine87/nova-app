@@ -12,38 +12,30 @@ except:
 
 st.set_page_config(page_title="Nova", page_icon="🎓")
 
-# --- CONNEXION SÉCURISÉE ---
+# --- CONNEXION ---
 if "GOOGLE_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 else:
     st.error("Clé API manquante dans les Secrets.")
     st.stop()
 
-# --- DÉTECTION DYNAMIQUE (ANTI-404) ---
+# --- SÉLECTION DU MODÈLE ---
 @st.cache_resource
-def find_working_model():
+def find_model():
     try:
-        # On demande à Google la liste des modèles utilisables sur TON compte
-        available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-        
-        # Priorité : 1. Flash (rapide), 2. Pro, 3. Le premier de la liste
-        for m_name in available_models:
-            if "1.5-flash" in m_name: return genai.GenerativeModel(m_name)
-        for m_name in available_models:
-            if "pro" in m_name: return genai.GenerativeModel(m_name)
-        
-        return genai.GenerativeModel(available_models[0])
-    except Exception as e:
-        # Si même la liste échoue, on tente le nom standard sans le préfixe 'models/'
+        models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        name = next((m for m in models if "flash" in m), models[0])
+        return genai.GenerativeModel(name)
+    except:
         return genai.GenerativeModel('gemini-1.5-flash')
 
-model = find_working_model()
+model = find_model()
 
 # --- INTERFACE ---
 st.title("✨ Nova : Aide aux devoirs")
 
 with st.sidebar:
-    st.info(f"Modèle actif : {model.model_name}")
+    st.info(f"Modèle : {model.model_name}")
     img_file = st.file_uploader("Photo de l'exercice", type=['png', 'jpg', 'jpeg'])
     if st.button("Réinitialiser"):
         st.session_state.messages = []
@@ -56,7 +48,7 @@ for i, m in enumerate(st.session_state.messages):
     with st.chat_message(m["role"]):
         st.write(m["content"])
 
-# --- ACTION ---
+# --- COEUR DU PROGRAMME ---
 if prompt := st.chat_input("Pose ta question ici..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
@@ -64,11 +56,17 @@ if prompt := st.chat_input("Pose ta question ici..."):
 
     with st.chat_message("assistant"):
         try:
-            content = [f"Tu es Nova, une tutrice pédagogue. Aide l'élève sur : {prompt}"]
+            content = [f"Tu es Nova, tutrice. Aide sur : {prompt}"]
             if img_file:
                 img = Image.open(img_file)
                 st.image(img, width=250)
                 content.append(img)
             
-            # Génération
-            response = model
+            response = model.generate_content(content)
+            txt = response.text
+            
+            st.write(txt)
+            st.session_state.messages.append({"role": "assistant", "content": txt})
+            
+            if voice_ok and txt:
+                tts
